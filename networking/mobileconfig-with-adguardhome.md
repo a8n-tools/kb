@@ -10,7 +10,12 @@ How to setup a mobileconfig profile to provide DNS-over-HTTP (DoH), DNS-over-TLS
 - (optional) [Lego](https://github.com/go-acme/lego) for Let's Encrypt
 - Linux hosting
 
-## Gotchas
+## Reasoning (Why)
+While Android supports Private DNS, it's left up to the VPN provider to reconfigure DNS after the configuration is made. When using Nebula, DNS has to
+be public facing until Nebula [configures DNS on the client](https://github.com/slackhq/nebula/issues/318). Exposing DNS to the internet is really for
+mobile device support.
+
+## Gotchas (Read carefully!)
 
 ### DoH/DoT/DoQ cannot be configured in MacOS/iOS without using a mobileconfig
 `networksetup` can set the DNS servers per interface. For example, this sets two DNS servers for Wi-Fi and Thunderbolt (Ethernet) connections.
@@ -46,7 +51,7 @@ Traefik can request TLS certificates for any domain it proxies. The downside is 
 the admin interface and a second route for DoH, two certs will be issued. This conflicts with AdGuardHomes requirement for using one cert. Lego overcomes
 this by using a wildcard certificate or SAN (subdomains).
 
-## Instructions
+## Procedure
 The `mobileconfig` is located in AdGuardHome > Setup Guide > DNS Privacy. Before downloading, you should perform due diligence to make sure everything
 works.
 
@@ -61,7 +66,9 @@ http_proxy: ""
 dns:
   # DoT/DoQ/DNS bind IPs
   bind_hosts:
-    - 139.64.237.232
+    # Public IP
+    - 1.1.1.1
+    # SD-WAN IP
     - 172.25.0.1
   port: 53
   trusted_proxies:
@@ -70,6 +77,7 @@ dns:
     - ::1/128
 tls:
   enabled: true
+  # Admin interface domain. Needs to match cert name
   server_name: dns.a8n.tools
   force_https: false
   port_https: 8444
@@ -83,6 +91,7 @@ tls:
   private_key: ""
   certificate_path: /etc/adguardhome/tls/dns.a8n.tools/certificate.crt
   private_key_path: /etc/adguardhome/tls/dns.a8n.tools/privatekey.key
+# Clients are configured in the web GUI
 clients:
   persistent:
     - name: laptop-01
@@ -100,3 +109,4 @@ log_max_age: 2
 log_compress: true
 log_localtime: false
 ```
+
