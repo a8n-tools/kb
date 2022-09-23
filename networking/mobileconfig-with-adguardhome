@@ -1,0 +1,49 @@
+# mobileconfig setup with AdGuardHome
+How to setup a mobileconfig profile to provide DNS-over-HTTP (DoH), DNS-over-TLS (DoT) and DNS-over-QUIC (DoQ) on MacOS using AdGuardHome.
+
+## Requirements
+- MacOS or iOS
+- [AdGuardHome](https://github.com/AdguardTeam/AdGuardHome)
+- (optional) SD-WAN such as [Nebula](https://github.com/slackhq/nebula/), [TailScale](https://github.com/tailscale/tailscale), or
+  [WireGuard](https://github.com/WireGuard)
+- (optional) [Traefik](https://github.com/traefik/traefik/) (reverse proxy for AdGuardHome)
+- (optional) [Lego](https://github.com/go-acme/lego) for Let's Encrypt
+- Linux hosting
+
+## Gotchas
+
+### DoH/DoT/DoQ cannot be configured in MacOS/iOS without using a mobileconfig
+`networksetup` can set the DNS servers per interface. For example, this sets two DNS servers for Wi-Fi and Thunderbolt (Ethernet) connections.
+
+```bash
+networksetup -setdnsservers Wi-Fi 172.25.0.1 9.9.9.9
+networksetup -setdnsservers "Thunderbolt Bridge" 172.25.0.1 9.9.9.9
+```
+
+However, `networksetup` accepts only IPs, not protocols like `tls://` or `https://`. DoH/DoT/DoQ cannot be configured in MacOS without using a mobileconfig.
+
+```bash
+networksetup -setdnsservers Wi-Fi tls://dns.a8n.tools:853 172.25.0.1 9.9.9.9
+tls://dns.a8n.tools:853 is not a valid IP address. No changes were saved...
+** Error: The parameters were not valid.
+```
+
+### AdGuardHome uses single IP for DoH and admin interface.
+AdGuardHome supports multiple interfaces for the various protocols **except** for DoH. The HTTP server for DoH is shared with the HTTP server for
+the admin interface (see [this comment](https://github.com/AdguardTeam/AdGuardHome/issues/741#issuecomment-934233825) in issue #741). A reverse proxy
+is needed to:
+1. separate the DoH and admin interfaces. AdGuardHome does not support 2FA and the admin interface should have better protections.
+2. provide a listener for additional IPs to proxy to AdGuardHome.
+
+### ClientIDs require additional TLS certificates
+AdGuardHome supports ClientIDs to identify clients when using encrypted connections. The DoT and DoQ protocols use subdomains to identify the clients.
+AdGuardHome states [wildcard certificates are required](https://github.com/AdguardTeam/AdGuardHome/wiki/Clients#clientid). That's not technically true
+as the only requirement is to have all names included in a single TLS certificate. If there are a handfull of clients, using SANs will work the same as
+wildcard certificates.
+
+Traefik can request TLS certificates for any domain it proxies. The downside is that there is a
+[one-to-one relationship](https://doc.traefik.io/traefik/https/acme/) between the Traefik `router` and the cert requested. If Traefik uses one route for
+the admin interface and a second route for DoH, two certs will be issued. These certs cannot be used by AdGuardHome. Lego overcomes this by requesting
+all necessary subdomains (SAN) or using a wildcard certificate.
+
+## Instructions
