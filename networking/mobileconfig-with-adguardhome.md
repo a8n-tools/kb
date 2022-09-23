@@ -43,7 +43,60 @@ wildcard certificates.
 
 Traefik can request TLS certificates for any domain it proxies. The downside is that there is a
 [one-to-one relationship](https://doc.traefik.io/traefik/https/acme/) between the Traefik `router` and the cert requested. If Traefik uses one route for
-the admin interface and a second route for DoH, two certs will be issued. These certs cannot be used by AdGuardHome. Lego overcomes this by requesting
-all necessary subdomains (SAN) or using a wildcard certificate.
+the admin interface and a second route for DoH, two certs will be issued. This conflicts with AdGuardHomes requirement for using one cert. Lego overcomes
+this by using a wildcard certificate or SAN (subdomains).
 
 ## Instructions
+The `mobileconfig` is located in AdGuardHome > Setup Guide > DNS Privacy. Before downloading, you should perform due diligence to make sure everything
+works.
+
+Here is the important sections of the AdGuardHome config.
+
+```yaml
+# admin and DoH bind IP
+bind_host: 127.0.0.1
+bind_port: 8081
+# http_proxy is used for the AdGuardHome HTTP client to download filters and such.
+http_proxy: ""
+dns:
+  # DoT/DoQ/DNS bind IPs
+  bind_hosts:
+    - 139.64.237.232
+    - 172.25.0.1
+  port: 53
+  trusted_proxies:
+    # Trust Traefik
+    - 127.0.0.0/8
+    - ::1/128
+tls:
+  enabled: true
+  server_name: dns.a8n.tools
+  force_https: false
+  port_https: 8444
+  port_dns_over_tls: 853
+  port_dns_over_quic: 784
+  port_dnscrypt: 0
+  dnscrypt_config_file: ""
+  allow_unencrypted_doh: false
+  strict_sni_check: false
+  certificate_chain: ""
+  private_key: ""
+  certificate_path: /etc/adguardhome/tls/dns.a8n.tools/certificate.crt
+  private_key_path: /etc/adguardhome/tls/dns.a8n.tools/privatekey.key
+clients:
+  persistent:
+    - name: laptop-01
+      tags:
+        - os_macos
+      ids:
+        - laptop-01
+# Useful for troubleshooting
+verbose: false
+log_file: /var/log/adguardhome/adguardhome.log
+# Some log settings don't seem to work. Be careful not to fill up the disk.
+log_max_backups: 3
+log_max_size: 100
+log_max_age: 2
+log_compress: true
+log_localtime: false
+```
